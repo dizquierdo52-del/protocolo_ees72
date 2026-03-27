@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EES 72 - Gestión de Protocolos en la Nube</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .transition-all { transition: all 0.3s ease; }
+        .hidden { display: none; }
+        .loading-overlay { background: rgba(255,255,255,0.8); backdrop-blur: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 pb-10">
+
+    <!-- Indicador de Carga -->
+    <div id="loading" class="fixed inset-0 z-[100] flex items-center justify-center loading-overlay">
+        <div class="text-center">
+            <div class="inline-block w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="text-slate-600 font-bold">Sincronizando con la nube...</p>
+        </div>
+    </div>
+
+    <!-- Header Principal -->
+    <header class="max-w-5xl mx-auto my-6 px-4">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center relative">
+            <button onclick="toggleAdminMode()" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-blue-600 transition-colors" title="Administración">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+
+            <div class="flex justify-center mb-3 text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+            </div>
+            <h1 class="text-xl md:text-3xl font-bold text-slate-900 leading-tight">E.E.S. Nro. 72 "Almirante Brown"</h1>
+            <p class="text-lg font-semibold text-slate-600 italic">Gestión Digital Colaborativa</p>
+            <div class="w-16 h-1 bg-blue-600 mx-auto my-4 rounded-full"></div>
+            <h2 class="text-sm font-medium text-slate-700 px-4 leading-relaxed italic">"Guía Provincial de Orientaciones - Res. 1982/23"</h2>
+        </div>
+    </header>
+
+    <!-- Panel de Administración (Firebase Cloud) -->
+    <div id="admin-panel" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+            <div class="p-6 border-b flex justify-between items-center bg-slate-50">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Sincronización en la Nube</h2>
+                    <p class="text-xs text-blue-600 font-bold">Los cambios se guardan automáticamente para todos los usuarios</p>
+                </div>
+                <button onclick="toggleAdminMode()" class="text-slate-400 hover:text-slate-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                <div id="admin-editor-content" class="space-y-6">
+                    <!-- Dinámico -->
+                </div>
+            </div>
+            
+            <div class="p-6 border-t bg-slate-50 flex justify-between items-center">
+                <div class="text-[10px] text-slate-400">ID de Dispositivo: <span id="user-id-display">...</span></div>
+                <button onclick="toggleAdminMode()" class="bg-slate-800 text-white px-8 py-2 rounded-xl font-bold hover:bg-slate-900 transition-all">Finalizar Edición</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-5xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="space-y-6">
+            <section>
+                <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">Ejes de Intervención</h3>
+                <div id="category-buttons" class="grid grid-cols-1 gap-3"></div>
+            </section>
+
+            <section class="bg-slate-800 text-white p-5 rounded-2xl shadow-lg">
+                <h3 class="font-bold mb-4 flex items-center gap-2 text-green-400 italic">Números de Emergencia</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between border-b border-slate-700 pb-2"><span>Línea 102 (Niñez)</span><span class="font-black">102</span></div>
+                    <div class="flex justify-between border-b border-slate-700 pb-2"><span>Línea 137 (Violencia)</span><span class="font-black">137</span></div>
+                    <div class="flex justify-between border-b border-slate-700 pb-2"><span>Policía</span><span class="font-black">911</span></div>
+                </div>
+            </section>
+        </div>
+
+        <div class="lg:col-span-2">
+            <div id="welcome-screen" class="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center text-slate-400">
+                <p class="text-lg">Seleccione un eje para ver los protocolos sincronizados.</p>
+            </div>
+
+            <div id="protocol-details" class="hidden bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <div id="cat-header" class="p-6 text-white transition-all">
+                    <h2 id="cat-title" class="text-2xl font-bold italic"></h2>
+                </div>
+                <div class="p-6">
+                    <div id="sit-buttons" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8"></div>
+                    <div id="step-container" class="hidden border-t border-slate-100 pt-6">
+                        <h4 class="text-lg font-bold italic text-slate-800 mb-4" id="protocol-name"></h4>
+                        <ul id="step-list" class="space-y-4 mb-6"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // CONFIGURACIÓN PROPORCIONADA POR EL ENTORNO
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ees72-protocolos-v1';
+
+        // Estado de la App
+        let appData = null;
+        let activeCatId = null;
+        let currentUser = null;
+
+        // 1. AUTENTICACIÓN (Requerido para Firestore)
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Error de autenticación:", error);
+                document.getElementById('loading').innerHTML = `<p class="text-red-600 p-4">Error de conexión. Verifique su red.</p>`;
+            }
+        };
+
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('user-id-display').innerText = user.uid;
+                startDataSync();
+            }
+        });
+
+        // 2. SINCRONIZACIÓN EN TIEMPO REAL
+        function startDataSync() {
+            if (!currentUser) return;
+
+            // Escuchamos el documento de protocolos en la ruta obligatoria
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'protocolos_config');
+            
+            onSnapshot(docRef, (docSnap) => {
+                document.getElementById('loading').classList.add('hidden');
+                
+                if (docSnap.exists()) {
+                    appData = docSnap.data().content;
+                } else {
+                    // Si no existe en la nube, inicializamos con datos por defecto
+                    appData = getDefaultData();
+                    saveToCloud(appData);
+                }
+                renderUI();
+            }, (error) => {
+                console.error("Error de lectura Firestore:", error);
+            });
+        }
+
+        async function saveToCloud(newData) {
+            if (!currentUser) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'protocolos_config');
+            try {
+                await setDoc(docRef, { 
+                    content: newData,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: currentUser.uid
+                });
+            } catch (e) {
+                console.error("Error al guardar en nube:", e);
+            }
+        }
+
+        // 3. RENDERIZADO DE INTERFAZ
+        function renderUI() {
+            const btnContainer = document.getElementById('category-buttons');
+            btnContainer.innerHTML = '';
+            
+            Object.keys(appData).forEach(id => {
+                const cat = appData[id];
+                const btn = document.createElement('button');
+                btn.onclick = () => selectCategory(id);
+                btn.id = `btn-${id}`;
+                btn.className = "cat-btn w-full text-left p-4 rounded-xl bg-white border border-slate-200 hover:border-blue-400 transition-all shadow-sm";
+                btn.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 ${cat.color.replace('bg-', 'bg-opacity-10 text-')} rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        </div>
+                        <div>
+                            <div class="font-bold text-slate-800">${cat.title}</div>
+                            <div class="text-[10px] text-slate-500 uppercase">${cat.situations.length} Protocolos Activos</div>
+                        </div>
+                    </div>
+                `;
+                btnContainer.appendChild(btn);
+            });
+
+            if (activeCatId) selectCategory(activeCatId);
+            if (!document.getElementById('admin-panel').classList.contains('hidden')) renderAdminEditor();
+        }
+
+        window.selectCategory = function(id) {
+            activeCatId = id;
+            const cat = appData[id];
+            document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('protocol-details').classList.remove('hidden');
+            document.getElementById('step-container').classList.add('hidden');
+            
+            document.getElementById('cat-header').className = `p-6 text-white ${cat.color}`;
+            document.getElementById('cat-title').innerText = cat.title;
+            
+            const sitContainer = document.getElementById('sit-buttons');
+            sitContainer.innerHTML = '';
+            cat.situations.forEach((sit, index) => {
+                const b = document.createElement('button');
+                b.className = "p-4 rounded-xl border border-slate-100 bg-slate-50 text-left font-semibold text-slate-700 hover:bg-white hover:shadow-md transition-all flex justify-between items-center";
+                b.innerHTML = `<span>${sit.name}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>`;
+                b.onclick = () => showProtocol(index);
+                sitContainer.appendChild(b);
+            });
+        }
+
+        window.showProtocol = function(index) {
+            const sit = appData[activeCatId].situations[index];
+            document.getElementById('step-container').classList.remove('hidden');
+            document.getElementById('protocol-name').innerText = sit.name;
+            const list = document.getElementById('step-list');
+            list.innerHTML = sit.steps.map((step, i) => `
+                <li class="flex gap-3 items-start animate-in fade-in">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${appData[activeCatId].color} text-white">${i+1}</span>
+                    <span class="text-sm text-slate-600">${step}</span>
+                </li>
+            `).join('');
+        }
+
+        // 4. EDITOR ADMINISTRATIVO
+        window.toggleAdminMode = function() {
+            const panel = document.getElementById('admin-panel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) renderAdminEditor();
+        }
+
+        function renderAdminEditor() {
+            const container = document.getElementById('admin-editor-content');
+            container.innerHTML = '';
+
+            Object.keys(appData).forEach(catId => {
+                const cat = appData[catId];
+                let catHtml = `
+                    <div class="border rounded-2xl p-4 bg-slate-50">
+                        <h4 class="font-black text-slate-800 mb-4 flex items-center gap-2 uppercase text-xs tracking-widest">
+                            <span class="w-2 h-2 rounded-full ${cat.color}"></span> ${cat.title}
+                        </h4>
+                        <div class="space-y-4">
+                `;
+
+                cat.situations.forEach((sit, sIdx) => {
+                    catHtml += `
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <div class="flex justify-between items-center mb-3">
+                                <input type="text" value="${sit.name}" onchange="updateSitName('${catId}', ${sIdx}, this.value)" class="font-bold text-slate-700 bg-transparent border-b border-transparent focus:border-blue-400 outline-none flex-1">
+                                <button onclick="deleteSituation('${catId}', ${sIdx})" class="text-red-300 hover:text-red-600 transition-colors ml-2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+                            </div>
+                            <div class="space-y-2">
+                                ${sit.steps.map((step, pIdx) => `
+                                    <div class="flex gap-2 items-center group">
+                                        <input type="text" value="${step}" onchange="updateStep('${catId}', ${sIdx}, ${pIdx}, this.value)" class="text-xs p-1 flex-1 border-b border-slate-50 outline-none focus:border-blue-400">
+                                        <button onclick="deleteStep('${catId}', ${sIdx}, ${pIdx})" class="text-slate-300 hover:text-red-500">×</button>
+                                    </div>
+                                `).join('')}
+                                <button onclick="addStep('${catId}', ${sIdx})" class="text-[10px] font-bold text-blue-500 mt-2 hover:underline">+ AÑADIR ACCIÓN</button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                catHtml += `
+                        <button onclick="addSituation('${catId}')" class="w-full py-2 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-[10px] font-bold hover:border-blue-300 hover:text-blue-500 transition-all">+ NUEVA SITUACIÓN EN ${cat.title}</button>
+                    </div></div>
+                `;
+                container.innerHTML += catHtml;
+            });
+        }
+
+        // Acciones CRUD (Nube)
+        window.updateSitName = (cId, sIdx, val) => { appData[cId].situations[sIdx].name = val; saveToCloud(appData); }
+        window.updateStep = (cId, sIdx, pIdx, val) => { appData[cId].situations[sIdx].steps[pIdx] = val; saveToCloud(appData); }
+        window.addStep = (cId, sIdx) => { appData[cId].situations[sIdx].steps.push("Nueva acción..."); renderAdminEditor(); saveToCloud(appData); }
+        window.deleteStep = (cId, sIdx, pIdx) => { appData[cId].situations[sIdx].steps.splice(pIdx, 1); renderAdminEditor(); saveToCloud(appData); }
+        window.addSituation = (cId) => { appData[cId].situations.push({ id: Date.now().toString(), name: "Nuevo Protocolo", steps: ["Primer paso..."] }); renderAdminEditor(); saveToCloud(appData); }
+        window.deleteSituation = (cId, sIdx) => { if(confirm("¿Eliminar?")) { appData[cId].situations.splice(sIdx, 1); renderAdminEditor(); saveToCloud(appData); } }
+
+        function getDefaultData() {
+            return {
+                convivencia: {
+                    title: 'Convivencia Escolar',
+                    color: 'bg-blue-600',
+                    situations: [
+                        { id: 'bul', name: 'Bullying / Hostigamiento', steps: ['Intervenir de inmediato.', 'Registrar en acta.', 'Citar familias.'] }
+                    ]
+                },
+                vulneracion: {
+                    title: 'Vulneración de Derechos',
+                    color: 'bg-red-600',
+                    situations: [
+                        { id: 'asi', name: 'Abuso sexual infanto juvenil / Maltrato', steps: ['Escucha activa.', 'Llamar al 102.', 'Informe a Supervisión.'] }
+                    ]
+                },
+                institucional: {
+                    title: 'Seguridad Institucional',
+                    color: 'bg-amber-600',
+                    situations: [
+                        { id: 'arm', name: 'Presencia de Armas', steps: ['Resguardo de alumnos.', 'Llamar al 911.', 'Acta institucional.'] }
+                    ]
+                }
+            };
+        }
+    </script>
+</body>
+</html>
