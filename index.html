@@ -43,10 +43,10 @@
         
         <!-- Sidebar Izquierdo -->
         <aside class="lg:col-span-4 space-y-6">
-            <div class="bg-white p-6 rounded-3xl border border-slate-200">
+            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Ejes de Intervención</h3>
                 <div id="category-buttons" class="space-y-3">
-                    <!-- Botones dinámicos -->
+                    <!-- Botones generados dinámicamente -->
                 </div>
             </div>
 
@@ -79,7 +79,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
                 </div>
                 <h4 class="text-slate-800 font-bold mb-2 italic text-lg">Consulta de Protocolos</h4>
-                <p class="text-slate-400 text-sm max-w-xs mx-auto">Selecciona un eje temático para visualizar los procedimientos obligatorios de actuación.</p>
+                <p class="text-slate-400 text-sm max-w-xs mx-auto">Selecciona un eje temático a la izquierda para visualizar los procedimientos de actuación institucional.</p>
             </div>
 
             <div id="protocol-details" class="hidden bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
@@ -103,7 +103,7 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                             </span>
                             <p class="text-xs text-amber-800 leading-relaxed font-medium">
-                                <strong>IMPORTANTE:</strong> Toda intervención debe ser registrada en el Libro de Actas institucional, preservando la identidad y dignidad de los y las estudiantes.
+                                <strong>IMPORTANTE:</strong> Toda intervención debe ser registrada en el Libro de Actas de la institución, preservando siempre la confidencialidad y la dignidad de los estudiantes.
                             </p>
                         </div>
                     </div>
@@ -112,7 +112,7 @@
         </section>
     </main>
 
-    <!-- Modal de Admin -->
+    <!-- Panel de Administración -->
     <div id="admin-panel" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div class="p-8 border-b flex justify-between items-center bg-slate-50">
@@ -126,12 +126,12 @@
             </div>
             <div id="admin-editor-content" class="p-8 overflow-y-auto space-y-6"></div>
             <div class="p-6 bg-slate-50 border-t flex justify-end">
-                <button onclick="toggleAdminMode()" class="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 transition-all">Finalizar Edición</button>
+                <button onclick="toggleAdminMode()" class="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 transition-all">Cerrar Editor</button>
             </div>
         </div>
     </div>
 
-    <!-- Scripts de Firebase -->
+    <!-- Firebase SDK e Interacciones -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -159,10 +159,14 @@
         let currentUser = null;
 
         const showError = (m) => {
-            document.getElementById('loading-content').innerHTML = `<p class="text-red-500 font-bold">${m}</p><button onclick="location.reload()" class="mt-4 text-xs font-bold underline">Reintentar</button>`;
+            const content = document.getElementById('loading-content');
+            if(content) {
+                content.innerHTML = `<p class="text-red-500 font-bold">${m}</p><button onclick="location.reload()" class="mt-4 text-xs font-bold underline">Reintentar conexión</button>`;
+            }
         };
 
-        signInAnonymously(auth).catch(() => showError("Error de sesión."));
+        // Autenticación inicial
+        signInAnonymously(auth).catch(() => showError("Error: No se pudo iniciar sesión anónima. Verifique su conexión."));
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -181,8 +185,11 @@
                     appData = seedData();
                     guardar(appData);
                 }
-                actualizarUI();
-            }, () => showError("Error de conexión a la nube."));
+                actualizarListaCategorias();
+            }, (error) => {
+                console.error("Firestore error:", error);
+                showError("Error de sincronización con la nube.");
+            });
         }
 
         async function guardar(datos) {
@@ -190,51 +197,65 @@
             try {
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'docs', docId);
                 await setDoc(docRef, { content: datos, lastSync: new Date().toISOString() }, { merge: true });
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Error al guardar:", e); }
         }
 
-        // Corregido: actualizarUI ya no llama a selectCat() para evitar recursión infinita
-        function actualizarUI() {
+        // Función corregida para evitar recursión: Actualiza SOLO el menú lateral
+        function actualizarListaCategorias() {
             if (!appData) return;
             const container = document.getElementById('category-buttons');
             container.innerHTML = '';
+            
             Object.keys(appData).forEach(id => {
                 const cat = appData[id];
                 const btn = document.createElement('button');
                 btn.onclick = () => selectCat(id);
-                // Marcamos el botón activo visualmente sin disparar la lógica de nuevo
+                
                 const isActive = activeCatId === id;
                 btn.className = `w-full text-left p-5 rounded-2xl bg-white border border-slate-200 hover:shadow-lg hover:border-blue-300 transition-all flex items-center justify-between group ${isActive ? 'ring-2 ring-blue-500 border-transparent shadow-md' : ''}`;
-                btn.innerHTML = `<div><div class="text-xs font-black text-slate-400 uppercase mb-1">${cat.situations.length} Temas</div><div class="font-bold text-slate-800">${cat.title}</div></div><div class="w-2 h-2 rounded-full ${cat.color} group-hover:scale-150 transition-transform"></div>`;
+                btn.innerHTML = `
+                    <div>
+                        <div class="text-xs font-black text-slate-400 uppercase mb-1">${cat.situations.length} Temas</div>
+                        <div class="font-bold text-slate-800">${cat.title}</div>
+                    </div>
+                    <div class="w-2 h-2 rounded-full ${cat.color} group-hover:scale-150 transition-transform"></div>
+                `;
                 container.appendChild(btn);
             });
             
-            // Si hay una categoría activa tras una actualización de datos cloud, refrescamos el panel de detalles discretamente
+            // Si ya hay una categoría activa, actualizamos su contenido interno (pero no volvemos a llamarnos)
             if (activeCatId && appData[activeCatId]) {
-                refreshProtocolDetails();
+                actualizarVistaDetalle();
             }
         }
 
         window.selectCat = (id) => {
             if (!appData[id]) return;
             activeCatId = id;
-            refreshProtocolDetails();
-            actualizarUI(); // Refresca solo los estados visuales de los botones
+            actualizarVistaDetalle();
+            
+            // Actualizamos solo los estilos visuales de los botones sin disparar lógica de nuevo
+            const buttons = document.querySelectorAll('#category-buttons button');
+            actualizarListaCategorias(); 
         }
 
-        // Función auxiliar para actualizar los detalles sin entrar en bucle con los botones
-        function refreshProtocolDetails() {
+        function actualizarVistaDetalle() {
             const cat = appData[activeCatId];
+            if(!cat) return;
+
             document.getElementById('welcome-screen').classList.add('hidden');
             document.getElementById('protocol-details').classList.remove('hidden');
             document.getElementById('step-container').classList.add('hidden');
-            document.getElementById('cat-header').className = `p-8 text-white ${cat.color}`;
+            
+            const header = document.getElementById('cat-header');
+            header.className = `p-8 text-white ${cat.color} transition-all duration-500`;
             document.getElementById('cat-title').innerText = cat.title;
-            const sitBtn = document.getElementById('sit-buttons');
-            sitBtn.innerHTML = cat.situations.map((s, i) => `
+            
+            const sitBtnContainer = document.getElementById('sit-buttons');
+            sitBtnContainer.innerHTML = cat.situations.map((s, i) => `
                 <button onclick="mostrarPasos(${i})" class="p-5 rounded-2xl bg-slate-50 text-left font-bold text-slate-700 hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm transition-all text-sm flex justify-between items-center group">
                     ${s.name}
-                    <span class="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    <span class="opacity-0 group-hover:opacity-100 transform translate-x-[-10px] group-hover:translate-x-0 transition-all">→</span>
                 </button>
             `).join('');
         }
@@ -242,39 +263,46 @@
         window.mostrarPasos = (idx) => {
             const sit = appData[activeCatId].situations[idx];
             if (!sit) return;
+            
             const container = document.getElementById('step-container');
             container.classList.remove('hidden');
             document.getElementById('protocol-name').innerText = sit.name;
             document.getElementById('step-list').innerHTML = sit.steps.map((s, i) => `
                 <li class="flex gap-4 items-start animate-fade-in" style="animation-delay: ${i*0.05}s">
-                    <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[11px] font-black">${i+1}</span>
+                    <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[11px] font-black shadow-sm">${i+1}</span>
                     <p class="text-sm text-slate-600 leading-relaxed font-medium pt-1">${s}</p>
                 </li>
             `).join('');
-            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         window.toggleAdminMode = () => {
-            document.getElementById('admin-panel').classList.toggle('hidden');
-            if(!document.getElementById('admin-panel').classList.contains('hidden')) renderAdmin();
+            const panel = document.getElementById('admin-panel');
+            panel.classList.toggle('hidden');
+            if(!panel.classList.contains('hidden')) renderAdmin();
         }
 
         function renderAdmin() {
             const editor = document.getElementById('admin-editor-content');
             editor.innerHTML = '';
             Object.keys(appData).forEach(cid => {
-                let html = `<div class="bg-slate-50 p-6 rounded-3xl">
+                let html = `
+                <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-4">
                     <h3 class="font-black text-slate-800 mb-4 flex items-center gap-2">
-                        <span class="w-1.5 h-1.5 rounded-full ${appData[cid].color}"></span>
+                        <span class="w-2 h-2 rounded-full ${appData[cid].color}"></span>
                         ${appData[cid].title}
                     </h3>
                     <div class="space-y-2 mb-4">`;
+                
                 appData[cid].situations.forEach((s, si) => {
-                    html += `<div class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                    html += `
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm">
                         <span class="text-xs font-bold text-slate-600">${s.name}</span>
-                        <button onclick="removeSit('${cid}', ${si})" class="text-red-400 hover:text-red-600 text-[10px] font-black uppercase tracking-tighter">Eliminar</button>
+                        <button onclick="removeSit('${cid}', ${si})" class="text-red-400 hover:text-red-600 text-[10px] font-black uppercase transition-colors">Eliminar</button>
                     </div>`;
                 });
+                
                 html += `</div>
                     <button onclick="addSit('${cid}')" class="w-full py-3 border-2 border-dashed border-slate-300 text-slate-400 text-[10px] font-black rounded-2xl hover:border-blue-300 hover:text-blue-500 transition-all uppercase tracking-widest">+ Nuevo Protocolo</button>
                 </div>`;
@@ -285,13 +313,16 @@
         window.addSit = (cid) => {
             const n = prompt("Nombre de la situación:");
             if(!n) return;
-            appData[cid].situations.push({name: n, steps: ["Intervención inmediata.", "Labrado de acta.", "Notificación a familia.", "Cierre de informe."]});
+            appData[cid].situations.push({
+                name: n, 
+                steps: ["Definir intervención inicial.", "Registrar en actas.", "Comunicar a autoridades/familias.", "Seguimiento institucional."]
+            });
             guardar(appData);
             renderAdmin();
         }
 
         window.removeSit = (cid, si) => {
-            if(confirm("¿Seguro que deseas eliminar este protocolo?")) {
+            if(confirm("¿Seguro que deseas eliminar este protocolo? Los cambios se guardarán automáticamente.")) {
                 appData[cid].situations.splice(si, 1);
                 guardar(appData);
                 renderAdmin();
@@ -302,15 +333,22 @@
             return {
                 convivencia: { 
                     title: 'Convivencia Escolar', color: 'bg-blue-600', 
-                    situations: [{name: 'Bullying / Hostigamiento', steps: ['Identificar situación de riesgo.', 'Entrevistas por separado.', 'Citar a las familias.', 'Aplicar medidas reparadoras.', 'Seguimiento por Equipo de Apoyo.']}] 
+                    situations: [
+                        {name: 'Bullying / Hostigamiento', steps: ['Identificar situación de riesgo.', 'Entrevistas individuales (no confrontar).', 'Citar a familias/tutores.', 'Aplicar acuerdos de convivencia.', 'Monitoreo de la dinámica grupal.']},
+                        {name: 'Conflictos con Docentes', steps: ['Escucha de las partes involucradas.', 'Mediación por equipo directivo.', 'Registro de acuerdos de mejora.', 'Seguimiento del clima de aula.']}
+                    ] 
                 },
                 vulneracion: { 
                     title: 'Vulneración de Derechos', color: 'bg-rose-600', 
-                    situations: [{name: 'Sospecha de Abuso/Maltrato', steps: ['Escucha activa (no interrogar).', 'Labrado de acta con dichos textuales.', 'Comunicación inmediata a Línea 102.', 'Informe a Supervisión.']}] 
+                    situations: [
+                        {name: 'Sospecha de Abuso/Maltrato', steps: ['Escucha activa y respetuosa.', 'Evitar revictimización.', 'Comunicación a Línea 102/UPI.', 'Informe a Supervisión.', 'Labrado de acta confidencial.']}
+                    ] 
                 },
                 salud: { 
                     title: 'Salud y Accidentes', color: 'bg-emerald-600', 
-                    situations: [{name: 'Accidente en la Escuela', steps: ['Brindar primeros auxilios.', 'Llamar a Emergencias (911/107).', 'Contactar a la familia.', 'Realizar denuncia ante el Seguro Escolar.']}] 
+                    situations: [
+                        {name: 'Accidente en Jornada Escolar', steps: ['Primeros auxilios básicos.', 'Llamado a emergencias (911/107).', 'Notificación inmediata a la familia.', 'Denuncia al seguro escolar.', 'Registro detallado de lo sucedido.']}
+                    ] 
                 }
             };
         }
