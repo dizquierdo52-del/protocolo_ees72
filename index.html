@@ -3,354 +3,675 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EES 72 - Gestión de Protocolos</title>
+    <title>Mbo'ehao Pro - Gestión de Suplencias</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .transition-all { transition: all 0.3s ease; }
-        .hidden { display: none; }
-        .loading-overlay { background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
+        
+        :root {
+            --primary: #4f46e5;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --admin: #0f172a;
+        }
+
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            transition: all 0.3s ease; 
+        }
+
+        .row-active {
+            background: linear-gradient(to right, #f8fafc, #ffffff);
+            border-left: 6px solid var(--primary);
+        }
+
+        .admin-section {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .admin-section.show { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-overlay { 
+            backdrop-filter: blur(10px); 
+            display: none; 
+            background: rgba(15, 23, 42, 0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .role-badge {
+            font-size: 9px; padding: 2px 8px; border-radius: 99px; font-weight: 800; text-transform: uppercase;
+        }
+        .role-ADMIN { background: #fee2e2; color: #991b1b; }
+        .role-AUXILIAR { background: #dcfce7; color: #166534; }
+        
+        .nov-tag { font-size: 8px; padding: 1px 5px; border-radius: 4px; font-weight: 800; }
+        .tag-AUSENCIA { background: #fee2e2; color: #b91c1c; }
+        .tag-LICENCIA { background: #e0e7ff; color: #4338ca; }
+        .tag-TARDE { background: #fef3c7; color: #b45309; }
+
+        .status-pill {
+            font-size: 8px; font-weight: 900; padding: 4px 8px; border-radius: 6px; text-transform: uppercase;
+            white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+        }
+        .pill-licencia { background: #4338ca; color: white; }
+        .pill-ausencia { background: #ef4444; color: white; }
+        .pill-tardanza { background: #f59e0b; color: white; }
+
+        .simulation-banner {
+            background: linear-gradient(90deg, #1e293b, #334155);
+            color: #94a3b8;
+        }
+
+        .suplente-tag {
+            color: #059669;
+            font-weight: 800;
+            font-style: italic;
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 pb-10">
+<body class="bg-slate-50 text-slate-900 min-h-screen pb-20">
 
-    <!-- Pantalla de Carga -->
-    <div id="loading" class="fixed inset-0 z-[100] flex items-center justify-center loading-overlay">
-        <div id="loading-content" class="text-center max-w-md px-6">
-            <div class="inline-block w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p class="text-slate-600 font-bold">Conectando con la base de datos de la EES 72...</p>
+    <!-- Simulación de Día -->
+    <div class="simulation-banner p-2 text-center text-[10px] font-bold flex justify-center items-center gap-4">
+        <span class="flex items-center gap-1 uppercase tracking-wider text-indigo-400">
+            <i data-lucide="test-tube-2" class="w-3 h-3"></i> Monitor Docente
+        </span>
+        <div class="flex items-center gap-2">
+            <label for="simDaySelect">Simular día:</label>
+            <select id="simDaySelect" onchange="renderTable()" class="bg-slate-800 text-white border-none rounded px-2 py-0.5 outline-none cursor-pointer">
+                <option value="AUTO">HOY (AUTOMÁTICO)</option>
+                <option value="LUNES">LUNES</option>
+                <option value="MARTES">MARTES</option>
+                <option value="MIERCOLES">MIÉRCOLES</option>
+                <option value="JUEVES">JUEVES</option>
+                <option value="VIERNES">VIERNES</option>
+            </select>
         </div>
     </div>
 
-    <!-- Encabezado -->
-    <header class="max-w-5xl mx-auto my-6 px-4">
-        <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 text-center relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-blue-600"></div>
-            <button onclick="toggleAdminMode()" class="absolute top-4 right-4 p-2 text-slate-300 hover:text-blue-600 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-            <h1 class="text-2xl md:text-4xl font-black text-slate-900 mb-1">E.E.S. Nº 72</h1>
-            <p class="text-blue-600 font-bold tracking-widest text-sm uppercase mb-4 italic">"Almirante Guillermo Brown"</p>
-            <h2 class="inline-block px-4 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-500 italic">Res. 1982/23 - Guía Provincial de Orientaciones</h2>
+    <!-- Barra de Navegación -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 p-4 shadow-sm">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="bg-indigo-600 p-2.5 rounded-2xl text-white shadow-lg">
+                    <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight text-slate-800">Mbo'ehao <span class="text-indigo-600">Pro</span></h1>
+                    <div class="flex items-center gap-2">
+                        <span id="userStatus" class="text-[9px] text-slate-400 font-bold uppercase tracking-widest italic">Panel de Control</span>
+                        <span id="sessionBadge" class="hidden"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-6">
+                <div class="text-right hidden sm:block">
+                    <p id="currentDate" class="text-[10px] text-slate-400 font-bold uppercase"></p>
+                    <p id="currentTime" class="text-xl font-black text-slate-800">00:00:00</p>
+                </div>
+                <button id="btnAuth" class="bg-slate-100 p-2.5 rounded-xl hover:bg-slate-200 transition-colors text-slate-600">
+                    <i id="authIcon" data-lucide="lock" class="w-5 h-5"></i>
+                </button>
+            </div>
         </div>
-    </header>
+    </nav>
 
-    <!-- Contenedor Principal -->
-    <main class="max-w-5xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <main class="max-w-7xl mx-auto p-4 lg:p-8 space-y-8">
         
-        <!-- Sidebar Izquierdo -->
-        <aside class="lg:col-span-4 space-y-6">
-            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Ejes de Intervención</h3>
-                <div id="category-buttons" class="space-y-3">
-                    <!-- Botones generados dinámicamente -->
+        <!-- PANEL DE ADMINISTRACIÓN -->
+        <div id="adminModule" class="admin-section space-y-6">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+                <h2 class="text-sm font-black text-slate-400 uppercase tracking-tighter flex items-center gap-2">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-indigo-500"></i> Gestión Administrativa
+                </h2>
+                <div class="flex gap-2">
+                    <button id="btnExport" onclick="exportBackup()" class="hidden text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-100">Exportar Backup</button>
+                    <button onclick="logout()" class="text-[10px] font-bold uppercase bg-red-50 text-red-600 px-4 py-2 rounded-xl hover:bg-red-100">Cerrar Sesión</button>
                 </div>
             </div>
 
-            <div class="bg-slate-900 p-6 rounded-3xl text-white shadow-xl shadow-blue-900/10">
-                <h3 class="text-green-400 font-bold text-sm mb-4 flex items-center gap-2">
-                    <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                    Teléfonos de Emergencia
-                </h3>
-                <div class="space-y-4">
-                    <div class="flex justify-between items-end border-b border-slate-800 pb-2">
-                        <span class="text-xs text-slate-400">Niñez y Adolescencia</span>
-                        <span class="text-xl font-black text-white leading-none">102</span>
-                    </div>
-                    <div class="flex justify-between items-end border-b border-slate-800 pb-2">
-                        <span class="text-xs text-slate-400">Violencia de Género</span>
-                        <span class="text-xl font-black text-white leading-none">137</span>
-                    </div>
-                    <div class="flex justify-between items-end">
-                        <span class="text-xs text-slate-400">Emergencias 911</span>
-                        <span class="text-xl font-black text-white leading-none">911</span>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Área de Contenido -->
-        <section class="lg:col-span-8">
-            <div id="welcome-screen" class="bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] p-16 text-center animate-fade-in h-full flex flex-col justify-center items-center">
-                <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-                </div>
-                <h4 class="text-slate-800 font-bold mb-2 italic text-lg">Consulta de Protocolos</h4>
-                <p class="text-slate-400 text-sm max-w-xs mx-auto">Selecciona un eje temático a la izquierda para visualizar los procedimientos de actuación institucional.</p>
-            </div>
-
-            <div id="protocol-details" class="hidden bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
-                <div id="cat-header" class="p-8 text-white transition-all">
-                    <h2 id="cat-title" class="text-3xl font-black italic tracking-tight"></h2>
-                </div>
-                <div class="p-8">
-                    <div id="sit-buttons" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-10"></div>
-                    
-                    <div id="step-container" class="hidden border-t border-slate-100 pt-8">
-                        <div class="flex items-center gap-3 mb-6">
-                            <div class="p-2 bg-blue-50 rounded-lg">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Registro de Novedades -->
+                <div class="lg:col-span-8 space-y-6">
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                        <h3 class="text-xs font-black uppercase mb-4 text-slate-500">Registrar Novedad</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+                            <div class="md:col-span-2">
+                                <select id="admTeacher" class="w-full p-3 bg-slate-50 border rounded-xl text-xs font-bold" onchange="updateMateriaList()">
+                                    <option value="">Seleccione un docente...</option>
+                                </select>
                             </div>
-                            <h4 id="protocol-name" class="text-xl font-bold text-slate-800 italic"></h4>
+                            <select id="admType" class="p-3 bg-slate-50 border rounded-xl text-xs font-bold" onchange="handleTypeChange()">
+                                <option value="AUSENCIA">AUSENCIA</option>
+                                <option value="TARDE">TARDANZA</option>
+                                <option value="LICENCIA">LICENCIA</option>
+                            </select>
+                            <div class="flex flex-col">
+                                <span class="text-[7px] font-black text-slate-400 uppercase ml-1">Fecha</span>
+                                <input type="date" id="admDate" class="p-2.5 bg-slate-50 border rounded-xl text-xs font-bold">
+                            </div>
+                            <div id="dateUntilContainer" class="hidden flex flex-col">
+                                <span class="text-[7px] font-black text-slate-400 uppercase ml-1">Hasta</span>
+                                <input type="date" id="admDateUntil" class="p-2.5 bg-slate-50 border rounded-xl text-xs font-bold">
+                            </div>
                         </div>
-                        <ul id="step-list" class="space-y-4"></ul>
                         
-                        <div class="mt-10 p-5 bg-amber-50 border border-amber-100 rounded-2xl flex gap-4 items-start">
-                            <span class="text-amber-500 mt-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                            </span>
-                            <p class="text-xs text-amber-800 leading-relaxed font-medium">
-                                <strong>IMPORTANTE:</strong> Toda intervención debe ser registrada en el Libro de Actas de la institución, preservando siempre la confidencialidad y la dignidad de los estudiantes.
-                            </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                            <div class="flex flex-col gap-1">
+                                <span class="text-[7px] font-black text-slate-400 uppercase ml-1">Alcance</span>
+                                <select id="admScope" class="p-3 bg-slate-50 border rounded-xl text-xs font-bold" onchange="toggleScope()">
+                                    <option id="optFull" value="FULL">TODA LA JORNADA</option>
+                                    <option id="optPartial" value="PARTIAL">MÓDULO ESPECÍFICO</option>
+                                </select>
+                            </div>
+                            <div id="partialSelect" class="flex flex-col gap-1 hidden">
+                                <span class="text-[7px] font-black text-slate-400 uppercase ml-1">Módulo Específico</span>
+                                <select id="admSpecific" class="w-full p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-bold"></select>
+                            </div>
+                        </div>
+
+                        <button onclick="saveNovelty()" class="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black text-[10px] uppercase hover:bg-indigo-700 transition-all shadow-lg">Guardar Registro</button>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                        <h3 class="text-xs font-black uppercase mb-4 text-slate-500">Historial Reciente</h3>
+                        <div class="overflow-x-auto max-h-64">
+                            <table class="w-full text-left text-[11px]">
+                                <thead class="sticky top-0 bg-white border-b border-slate-100 text-slate-400 font-black uppercase text-[9px]">
+                                    <tr>
+                                        <th class="py-3 px-2">Tipo</th>
+                                        <th class="py-3 px-2">Docente</th>
+                                        <th class="py-3 px-2">Periodo / Fecha</th>
+                                        <th class="py-3 px-2 text-right">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="noveltyLogTable" class="divide-y divide-slate-50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Perfiles y Datos -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div id="sectionUsers" class="hidden bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                        <h3 class="text-xs font-black uppercase mb-4 text-slate-500">Gestión de Usuarios</h3>
+                        <div class="space-y-2 mb-4">
+                            <input type="text" id="nuName" placeholder="Usuario" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold">
+                            <input type="password" id="nuPass" placeholder="Contraseña" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold">
+                            <select id="nuProfile" class="w-full p-2.5 bg-slate-50 border rounded-xl text-xs font-bold">
+                                <option value="ADMIN">ADMINISTRADOR</option>
+                                <option value="AUXILIAR">AUXILIAR</option>
+                            </select>
+                            <button onclick="createUser()" class="w-full bg-slate-900 text-white p-2.5 rounded-xl font-black text-[9px] uppercase">Crear Nuevo</button>
+                        </div>
+                        <div class="max-h-32 overflow-y-auto divide-y text-[10px]" id="userListTable"></div>
+                    </div>
+
+                    <div id="sectionMaintenance" class="hidden bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                        <h3 class="text-xs font-black uppercase mb-4 text-slate-500">Mantenimiento</h3>
+                        <div class="space-y-3">
+                            <input type="file" id="importBackupFull" accept=".json" class="hidden">
+                            <label for="importBackupFull" class="w-full bg-indigo-50 text-indigo-700 p-4 rounded-2xl flex flex-col items-center justify-center cursor-pointer border-2 border-indigo-100 text-center">
+                                <i data-lucide="database-backup" class="w-5 h-5 mb-1"></i>
+                                <span class="text-[9px] font-black uppercase">Importar Backup Full</span>
+                            </label>
+                            
+                            <input type="file" id="importHorariosOnly" accept=".json" class="hidden">
+                            <label for="importHorariosOnly" class="w-full bg-slate-50 border-2 border-dashed border-slate-200 p-4 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-center">
+                                <i data-lucide="file-spreadsheet" class="w-5 h-5 text-slate-400 mb-1"></i>
+                                <span class="text-[9px] font-black text-slate-500 uppercase">Actualizar Horarios</span>
+                            </label>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
+
+        <!-- Filtros del Dashboard -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col md:flex-row gap-4 items-center">
+            <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                <select id="filterCurso" class="p-3 bg-slate-50 border rounded-2xl text-xs font-extrabold outline-none">
+                    <option value="ALL">TODOS LOS CURSOS</option>
+                </select>
+                <select id="filterProfesor" class="p-3 bg-slate-50 border rounded-2xl text-xs font-extrabold outline-none">
+                    <option value="ALL">TODOS LOS DOCENTES</option>
+                </select>
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="globalSearch" placeholder="Buscar materia..." class="w-full pl-11 pr-4 py-3 bg-slate-50 border rounded-2xl text-xs font-extrabold outline-none">
+                </div>
+            </div>
+            <div class="bg-slate-900 text-white px-6 py-3 rounded-2xl flex items-center gap-3">
+                <i data-lucide="calendar" class="w-4 h-4 text-indigo-400"></i>
+                <p id="dayBadge" class="text-xs font-black uppercase italic tracking-widest">---</p>
+            </div>
+        </div>
+
+        <!-- Tabla Principal -->
+        <div class="bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 border-b border-slate-100">
+                        <tr class="text-[10px] uppercase font-black text-slate-400">
+                            <th class="px-8 py-5">Horario</th>
+                            <th class="px-8 py-5">Curso</th>
+                            <th class="px-8 py-5">Materia</th>
+                            <th class="px-8 py-5">Docente / Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-50"></tbody>
+                </table>
+            </div>
+        </div>
     </main>
 
-    <!-- Panel de Administración -->
-    <div id="admin-panel" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="p-8 border-b flex justify-between items-center bg-slate-50">
-                <div>
-                    <h2 class="text-xl font-black text-slate-800">Editor Cloud</h2>
-                    <p class="text-[10px] text-blue-600 font-black uppercase tracking-widest">Sincronización en Tiempo Real</p>
-                </div>
-                <button onclick="toggleAdminMode()" class="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-            </div>
-            <div id="admin-editor-content" class="p-8 overflow-y-auto space-y-6"></div>
-            <div class="p-6 bg-slate-50 border-t flex justify-end">
-                <button onclick="toggleAdminMode()" class="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-sm hover:scale-105 transition-all">Cerrar Editor</button>
+    <!-- Modal Login -->
+    <div id="loginModal" class="modal-overlay fixed inset-0 p-4">
+        <div class="bg-white p-8 rounded-[2.5rem] w-full max-sm shadow-2xl border border-slate-100">
+            <h2 class="text-xl font-black text-slate-800 uppercase text-center mb-6">Acceso</h2>
+            <div class="space-y-4">
+                <input type="text" id="loginUser" placeholder="Usuario" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-indigo-600">
+                <input type="password" id="loginPass" placeholder="Contraseña" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold border-2 border-transparent focus:border-indigo-600">
+                <button id="btnLogin" class="w-full bg-slate-900 text-white p-4 rounded-2xl font-black uppercase tracking-widest">Entrar</button>
+                <button onclick="closeModals()" class="w-full text-slate-400 text-[10px] font-bold uppercase py-2">Cancelar</button>
             </div>
         </div>
     </div>
 
-    <!-- Firebase SDK e Interacciones -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <script>
+        const DIAS = { 0: "DOMINGO", 1: "LUNES", 2: "MARTES", 3: "MIERCOLES", 4: "JUEVES", 5: "VIERNES", 6: "SABADO" };
+        const STORAGE_KEY = 'mboehao_v10_final';
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyConEv937V9qbWKRqx6G4eB8yV1CRREvL0",
-            authDomain: "protocolos72-3e5fc.firebaseapp.com",
-            projectId: "protocolos72-3e5fc",
-            storageBucket: "protocolos72-3e5fc.firebasestorage.app",
-            messagingSenderId: "47152395987",
-            appId: "1:47152395987:web:35ea9cd3bb4e20e1078626",
-            measurementId: "G-MSWTVYZ7HE"
+        let db = {
+            horarios: [],
+            novedades: [],
+            usuarios: [{ id: 1, user: 'admin', pass: 'admin123', profile: 'ADMIN' }],
+            currentUser: null
         };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        
-        const appId = "protocolos72_v1"; 
-        const docId = "db_v2"; 
+        window.onload = () => {
+            loadStorage();
+            updateClock();
+            setInterval(updateClock, 1000);
+            
+            document.getElementById('btnAuth').onclick = () => db.currentUser ? toggleAdminUI() : document.getElementById('loginModal').classList.add('active');
+            document.getElementById('btnLogin').onclick = login;
+            document.getElementById('importBackupFull').onchange = (e) => handleFileImport(e, 'backup');
+            document.getElementById('importHorariosOnly').onchange = (e) => handleFileImport(e, 'horarios');
+            
+            ['filterCurso', 'filterProfesor'].forEach(id => document.getElementById(id).onchange = renderTable);
+            document.getElementById('globalSearch').oninput = renderTable;
+            
+            handleTypeChange();
+            lucide.createIcons();
+        };
 
-        let appData = null;
-        let activeCatId = null;
-        let currentUser = null;
-
-        const showError = (m) => {
-            const content = document.getElementById('loading-content');
-            if(content) {
-                content.innerHTML = `<p class="text-red-500 font-bold">${m}</p><button onclick="location.reload()" class="mt-4 text-xs font-bold underline">Reintentar conexión</button>`;
+        function loadStorage() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                db.horarios = parsed.horarios || [];
+                db.novedades = (parsed.novedades || []).map(n => ({...n, id: n.id || Date.now()}));
+                db.usuarios = parsed.usuarios || db.usuarios;
             }
-        };
+            refreshUI();
+        }
 
-        // Autenticación inicial
-        signInAnonymously(auth).catch(() => showError("Error: No se pudo iniciar sesión anónima. Verifique su conexión."));
+        function saveStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                horarios: db.horarios,
+                novedades: db.novedades,
+                usuarios: db.usuarios
+            }));
+        }
 
-        onAuthStateChanged(auth, (user) => {
+        function formatShortDate(isoString) {
+            if(!isoString) return "";
+            const [y, m, d] = isoString.split('-');
+            return `${d}/${m}/${y.slice(-2)}`;
+        }
+
+        function normalizeCurso(n) { 
+            if(!n) return "---";
+            return n.toUpperCase()
+                .replace('.DOCX', '').replace('.JSON', '').replace('PLANILLA', '').replace('PARTE', '')
+                .trim();
+        }
+
+        function handleTypeChange() {
+            const type = document.getElementById('admType').value;
+            document.getElementById('dateUntilContainer').classList.toggle('hidden', type !== 'LICENCIA');
+            document.getElementById('optPartial').disabled = (type === 'LICENCIA');
+            if(type === 'LICENCIA') document.getElementById('admScope').value = 'FULL';
+            toggleScope();
+        }
+
+        function toggleScope() {
+            const scope = document.getElementById('admScope').value;
+            document.getElementById('partialSelect').classList.toggle('hidden', scope === 'FULL');
+        }
+
+        function login() {
+            const u = document.getElementById('loginUser').value.trim();
+            const p = document.getElementById('loginPass').value.trim();
+            const user = db.usuarios.find(x => x.user === u && x.pass === p);
             if (user) {
-                currentUser = user;
-                iniciarSincronizacion();
-            }
-        });
-
-        function iniciarSincronizacion() {
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'docs', docId);
-            onSnapshot(docRef, (snap) => {
-                document.getElementById('loading').classList.add('hidden');
-                if (snap.exists()) {
-                    appData = snap.data().content;
-                } else {
-                    appData = seedData();
-                    guardar(appData);
-                }
-                actualizarListaCategorias();
-            }, (error) => {
-                console.error("Firestore error:", error);
-                showError("Error de sincronización con la nube.");
-            });
+                db.currentUser = user;
+                closeModals();
+                updateAuthUI();
+                applyPermissions();
+                document.getElementById('adminModule').classList.add('show');
+                populateAdminOptions();
+                renderNoveltyLog();
+                renderUserList();
+            } else { toast("Credenciales Inválidas", "red"); }
         }
 
-        async function guardar(datos) {
-            if (!currentUser) return;
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'docs', docId);
-                await setDoc(docRef, { content: datos, lastSync: new Date().toISOString() }, { merge: true });
-            } catch (e) { console.error("Error al guardar:", e); }
+        function applyPermissions() {
+            const isAdmin = db.currentUser?.profile === 'ADMIN';
+            document.getElementById('sectionUsers').classList.toggle('hidden', !isAdmin);
+            document.getElementById('sectionMaintenance').classList.toggle('hidden', !isAdmin);
+            document.getElementById('btnExport').classList.toggle('hidden', !isAdmin);
         }
 
-        // Función corregida para evitar recursión: Actualiza SOLO el menú lateral
-        function actualizarListaCategorias() {
-            if (!appData) return;
-            const container = document.getElementById('category-buttons');
-            container.innerHTML = '';
-            
-            Object.keys(appData).forEach(id => {
-                const cat = appData[id];
-                const btn = document.createElement('button');
-                btn.onclick = () => selectCat(id);
-                
-                const isActive = activeCatId === id;
-                btn.className = `w-full text-left p-5 rounded-2xl bg-white border border-slate-200 hover:shadow-lg hover:border-blue-300 transition-all flex items-center justify-between group ${isActive ? 'ring-2 ring-blue-500 border-transparent shadow-md' : ''}`;
-                btn.innerHTML = `
-                    <div>
-                        <div class="text-xs font-black text-slate-400 uppercase mb-1">${cat.situations.length} Temas</div>
-                        <div class="font-bold text-slate-800">${cat.title}</div>
-                    </div>
-                    <div class="w-2 h-2 rounded-full ${cat.color} group-hover:scale-150 transition-transform"></div>
-                `;
-                container.appendChild(btn);
-            });
-            
-            // Si ya hay una categoría activa, actualizamos su contenido interno (pero no volvemos a llamarnos)
-            if (activeCatId && appData[activeCatId]) {
-                actualizarVistaDetalle();
+        function logout() { db.currentUser = null; location.reload(); }
+
+        function updateAuthUI() {
+            const u = db.currentUser;
+            if(u) {
+                document.getElementById('userStatus').textContent = u.user;
+                const badge = document.getElementById('sessionBadge');
+                badge.textContent = u.profile;
+                badge.className = `role-badge role-${u.profile} block`;
+                document.getElementById('authIcon').setAttribute('data-lucide', 'unlock');
+                lucide.createIcons();
             }
         }
 
-        window.selectCat = (id) => {
-            if (!appData[id]) return;
-            activeCatId = id;
-            actualizarVistaDetalle();
+        function toggleAdminUI() { document.getElementById('adminModule').classList.toggle('show'); }
+
+        function saveNovelty() {
+            const t = document.getElementById('admTeacher').value;
+            const d1 = document.getElementById('admDate').value;
+            const d2 = document.getElementById('admDateUntil').value;
+            const type = document.getElementById('admType').value;
+            const scope = document.getElementById('admScope').value;
+            const specificId = document.getElementById('admSpecific').value;
             
-            // Actualizamos solo los estilos visuales de los botones sin disparar lógica de nuevo
-            const buttons = document.querySelectorAll('#category-buttons button');
-            actualizarListaCategorias(); 
+            if(!t || !d1) return toast("Complete los campos requeridos", "red");
+            
+            db.novedades.unshift({
+                id: Date.now(), 
+                docente: t, 
+                date: d1,
+                dateUntil: type === 'LICENCIA' ? (d2 || d1) : d1,
+                type: type, 
+                scopeType: scope,      
+                specificId: specificId
+            });
+
+            saveStorage();
+            renderTable();
+            renderNoveltyLog();
+            toast("Registro guardado correctamente");
         }
 
-        function actualizarVistaDetalle() {
-            const cat = appData[activeCatId];
-            if(!cat) return;
-
-            document.getElementById('welcome-screen').classList.add('hidden');
-            document.getElementById('protocol-details').classList.remove('hidden');
-            document.getElementById('step-container').classList.add('hidden');
+        function renderNoveltyLog() {
+            const table = document.getElementById('noveltyLogTable');
+            const isAdmin = db.currentUser?.profile === 'ADMIN';
             
-            const header = document.getElementById('cat-header');
-            header.className = `p-8 text-white ${cat.color} transition-all duration-500`;
-            document.getElementById('cat-title').innerText = cat.title;
-            
-            const sitBtnContainer = document.getElementById('sit-buttons');
-            sitBtnContainer.innerHTML = cat.situations.map((s, i) => `
-                <button onclick="mostrarPasos(${i})" class="p-5 rounded-2xl bg-slate-50 text-left font-bold text-slate-700 hover:bg-white border border-transparent hover:border-slate-200 hover:shadow-sm transition-all text-sm flex justify-between items-center group">
-                    ${s.name}
-                    <span class="opacity-0 group-hover:opacity-100 transform translate-x-[-10px] group-hover:translate-x-0 transition-all">→</span>
-                </button>
+            table.innerHTML = db.novedades.map(n => `
+                <tr class="hover:bg-slate-50">
+                    <td class="py-3 px-2"><span class="nov-tag tag-${n.type}">${n.type}</span></td>
+                    <td class="py-3 px-2 font-black text-slate-700">${n.docente}</td>
+                    <td class="py-3 px-2 text-[9px] uppercase font-bold text-indigo-500">
+                        ${n.type === 'LICENCIA' ? `${formatShortDate(n.date)} al ${formatShortDate(n.dateUntil)}` : formatShortDate(n.date)}
+                    </td>
+                    <td class="py-3 px-2 text-right">
+                        ${isAdmin ? `<button onclick="delNovelty(${n.id})" class="text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                    </td>
+                </tr>
             `).join('');
+            lucide.createIcons();
         }
 
-        window.mostrarPasos = (idx) => {
-            const sit = appData[activeCatId].situations[idx];
-            if (!sit) return;
-            
-            const container = document.getElementById('step-container');
-            container.classList.remove('hidden');
-            document.getElementById('protocol-name').innerText = sit.name;
-            document.getElementById('step-list').innerHTML = sit.steps.map((s, i) => `
-                <li class="flex gap-4 items-start animate-fade-in" style="animation-delay: ${i*0.05}s">
-                    <span class="flex-shrink-0 w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[11px] font-black shadow-sm">${i+1}</span>
-                    <p class="text-sm text-slate-600 leading-relaxed font-medium pt-1">${s}</p>
-                </li>
-            `).join('');
-            
-            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        function delNovelty(id) {
+            if(db.currentUser?.profile !== 'ADMIN') return;
+            db.novedades = db.novedades.filter(n => n.id !== id);
+            saveStorage();
+            renderNoveltyLog();
+            renderTable();
         }
 
-        window.toggleAdminMode = () => {
-            const panel = document.getElementById('admin-panel');
-            panel.classList.toggle('hidden');
-            if(!panel.classList.contains('hidden')) renderAdmin();
-        }
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const now = new Date();
+            const todayIso = now.toISOString().split('T')[0];
+            const simDay = document.getElementById('simDaySelect').value;
+            const currentDay = simDay === 'AUTO' ? DIAS[now.getDay()] : simDay;
 
-        function renderAdmin() {
-            const editor = document.getElementById('admin-editor-content');
-            editor.innerHTML = '';
-            Object.keys(appData).forEach(cid => {
-                let html = `
-                <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-4">
-                    <h3 class="font-black text-slate-800 mb-4 flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full ${appData[cid].color}"></span>
-                        ${appData[cid].title}
-                    </h3>
-                    <div class="space-y-2 mb-4">`;
+            const fSearch = document.getElementById('globalSearch').value.toLowerCase();
+            const fCurso = document.getElementById('filterCurso').value;
+            const fProf = document.getElementById('filterProfesor').value;
+
+            document.getElementById('dayBadge').textContent = currentDay;
+
+            const filtered = db.horarios.filter(h => {
+                const horaLiteral = (h.hora || "").toLowerCase();
+                if (horaLiteral.includes("hora") || horaLiteral.includes("horario")) return false;
+                if (!h.espacio_curricular || !h.profesor || h.profesor.trim() === "") return false;
                 
-                appData[cid].situations.forEach((s, si) => {
-                    html += `
-                    <div class="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm">
-                        <span class="text-xs font-bold text-slate-600">${s.name}</span>
-                        <button onclick="removeSit('${cid}', ${si})" class="text-red-400 hover:text-red-600 text-[10px] font-black uppercase transition-colors">Eliminar</button>
-                    </div>`;
+                const diaH = (h.dia || "").toUpperCase();
+                const dayMatch = diaH.includes(currentDay.substring(0,4));
+                const searchMatch = (h.espacio_curricular || "").toLowerCase().includes(fSearch);
+                const cursoMatch = fCurso === 'ALL' || normalizeCurso(h.archivo_origen) === fCurso;
+                const profMatch = fProf === 'ALL' || h.profesor === fProf;
+                return dayMatch && searchMatch && cursoMatch && profMatch;
+            });
+
+            tbody.innerHTML = filtered.map(item => {
+                const isActive = checkTime(item.horario);
+                
+                // Buscar suplente en el JSON original
+                const suplenteNombre = item.suplente || item.control_directivo || "";
+                
+                const novelty = db.novedades.find(n => {
+                    const dMatch = (todayIso >= n.date && todayIso <= (n.dateUntil || n.date));
+                    const pMatch = n.docente.trim() === item.profesor.trim();
+                    const sMatch = (n.scopeType === 'FULL' || !n.scopeType || n.specificId == item.id);
+                    return dMatch && pMatch && sMatch;
                 });
                 
-                html += `</div>
-                    <button onclick="addSit('${cid}')" class="w-full py-3 border-2 border-dashed border-slate-300 text-slate-400 text-[10px] font-black rounded-2xl hover:border-blue-300 hover:text-blue-500 transition-all uppercase tracking-widest">+ Nuevo Protocolo</button>
-                </div>`;
-                editor.innerHTML += html;
-            });
-        }
+                let rowStyle = "";
+                let statusLabel = "";
 
-        window.addSit = (cid) => {
-            const n = prompt("Nombre de la situación:");
-            if(!n) return;
-            appData[cid].situations.push({
-                name: n, 
-                steps: ["Definir intervención inicial.", "Registrar en actas.", "Comunicar a autoridades/familias.", "Seguimiento institucional."]
-            });
-            guardar(appData);
-            renderAdmin();
-        }
-
-        window.removeSit = (cid, si) => {
-            if(confirm("¿Seguro que deseas eliminar este protocolo? Los cambios se guardarán automáticamente.")) {
-                appData[cid].situations.splice(si, 1);
-                guardar(appData);
-                renderAdmin();
-            }
-        }
-
-        function seedData() {
-            return {
-                convivencia: { 
-                    title: 'Convivencia Escolar', color: 'bg-blue-600', 
-                    situations: [
-                        {name: 'Bullying / Hostigamiento', steps: ['Identificar situación de riesgo.', 'Entrevistas individuales (no confrontar).', 'Citar a familias/tutores.', 'Aplicar acuerdos de convivencia.', 'Monitoreo de la dinámica grupal.']},
-                        {name: 'Conflictos con Docentes', steps: ['Escucha de las partes involucradas.', 'Mediación por equipo directivo.', 'Registro de acuerdos de mejora.', 'Seguimiento del clima de aula.']}
-                    ] 
-                },
-                vulneracion: { 
-                    title: 'Vulneración de Derechos', color: 'bg-rose-600', 
-                    situations: [
-                        {name: 'Sospecha de Abuso/Maltrato', steps: ['Escucha activa y respetuosa.', 'Evitar revictimización.', 'Comunicación a Línea 102/UPI.', 'Informe a Supervisión.', 'Labrado de acta confidencial.']}
-                    ] 
-                },
-                salud: { 
-                    title: 'Salud y Accidentes', color: 'bg-emerald-600', 
-                    situations: [
-                        {name: 'Accidente en Jornada Escolar', steps: ['Primeros auxilios básicos.', 'Llamado a emergencias (911/107).', 'Notificación inmediata a la familia.', 'Denuncia al seguro escolar.', 'Registro detallado de lo sucedido.']}
-                    ] 
+                if (novelty) {
+                    if (novelty.type === 'LICENCIA') {
+                        rowStyle = "bg-indigo-50/50 border-l-4 border-indigo-500";
+                        statusLabel = `
+                            <div class="flex flex-col gap-0.5">
+                                <span class="status-pill pill-licencia"><i data-lucide="info" class="w-3 h-3"></i> LICENCIA</span>
+                                <span class="text-[7px] font-black text-indigo-400 uppercase ml-1">DEL ${formatShortDate(novelty.date)} AL ${formatShortDate(novelty.dateUntil)}</span>
+                            </div>
+                        `;
+                    } else if (novelty.type === 'AUSENCIA') {
+                        rowStyle = "bg-red-50/50 border-l-4 border-red-500";
+                        statusLabel = `<span class="status-pill pill-ausencia"><i data-lucide="x-circle" class="w-3 h-3"></i> AUSENTE</span>`;
+                    } else if (novelty.type === 'TARDE') {
+                        rowStyle = "bg-amber-50/50 border-l-4 border-amber-500";
+                        statusLabel = `<span class="status-pill pill-tardanza"><i data-lucide="clock" class="w-3 h-3"></i> TARDANZA</span>`;
+                    }
+                } else if (isActive) {
+                    rowStyle = "row-active";
+                    statusLabel = `<span class="text-[8px] font-black text-indigo-500 animate-pulse uppercase tracking-tighter">En clase ahora</span>`;
                 }
+
+                return `
+                    <tr class="${rowStyle} hover:bg-slate-50 transition-all">
+                        <td class="px-8 py-5">
+                            <span class="text-xs font-black block text-slate-700">${item.hora}</span>
+                            <span class="text-[9px] text-slate-400 font-mono italic">${item.horario}</span>
+                        </td>
+                        <td class="px-8 py-5">
+                            <span class="bg-slate-100 text-slate-500 px-3 py-1 rounded-lg text-[9px] font-black uppercase">
+                                ${normalizeCurso(item.archivo_origen)}
+                            </span>
+                        </td>
+                        <td class="px-8 py-5">
+                            <p class="text-xs font-bold text-slate-800 leading-tight">${item.espacio_curricular}</p>
+                        </td>
+                        <td class="px-8 py-5">
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-xs font-black text-slate-800">
+                                    ${item.profesor} 
+                                    ${suplenteNombre ? `<span class="suplente-tag ml-1">(${suplenteNombre})</span>` : ''}
+                                </span>
+                                ${statusLabel}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('es-AR', { hour12: false });
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+            if(now.getSeconds() === 0) renderTable();
+        }
+
+        function checkTime(range) {
+            if(!range || !range.includes(' a ')) return false;
+            const [s, e] = range.toLowerCase().split(' a ');
+            const now = new Date();
+            const current = now.getHours() * 60 + now.getMinutes();
+            const parse = (t) => {
+                const parts = t.trim().replace('.',':').split(':');
+                return parseInt(parts[0]) * 60 + (parts[1] ? parseInt(parts[1]) : 0);
+            }
+            return current >= parse(s) && current <= parse(e);
+        }
+
+        function refreshUI() {
+            const rawProfs = db.horarios.map(h => h.profesor).filter(p => p && p.trim() !== "");
+            const cursos = [...new Set(db.horarios.map(h => normalizeCurso(h.archivo_origen)))].filter(c => c !== "---").sort();
+            const profs = [...new Set(rawProfs)].sort();
+            
+            document.getElementById('filterCurso').innerHTML = '<option value="ALL">TODOS LOS CURSOS</option>' + cursos.map(c => `<option value="${c}">${c}</option>`).join('');
+            document.getElementById('filterProfesor').innerHTML = '<option value="ALL">TODOS LOS DOCENTES</option>' + profs.map(p => `<option value="${p}">${p}</option>`).join('');
+            renderTable();
+        }
+
+        function createUser() {
+            if(db.currentUser?.profile !== 'ADMIN') return;
+            const name = document.getElementById('nuName').value.trim();
+            const pass = document.getElementById('nuPass').value.trim();
+            const prof = document.getElementById('nuProfile').value;
+            if(!name || !pass) return toast("Faltan datos", "red");
+            db.usuarios.push({ id: Date.now(), user: name, pass: pass, profile: prof });
+            saveStorage();
+            renderUserList();
+            toast("Usuario creado");
+        }
+
+        function renderUserList() {
+            const list = document.getElementById('userListTable');
+            const isAdmin = db.currentUser?.profile === 'ADMIN';
+            list.innerHTML = db.usuarios.map(u => `
+                <div class="flex justify-between items-center py-1.5 group">
+                    <span class="font-bold text-slate-600 text-[9px] uppercase tracking-wide">${u.user} (${u.profile})</span>
+                    ${isAdmin && u.user !== 'admin' ? `<button onclick="delUser(${u.id})" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function delUser(id) {
+            if(db.currentUser?.profile !== 'ADMIN') return;
+            db.usuarios = db.usuarios.filter(u => u.id !== id);
+            saveStorage();
+            renderUserList();
+        }
+
+        function updateMateriaList() {
+            const t = document.getElementById('admTeacher').value;
+            const list = db.horarios.filter(h => h.profesor === t);
+            const select = document.getElementById('admSpecific');
+            select.innerHTML = list.map(h => `<option value="${h.id}">${h.hora} - ${h.espacio_curricular} (${normalizeCurso(h.archivo_origen)})</option>`).join('');
+        }
+
+        function populateAdminOptions() {
+            const rawProfs = db.horarios.map(h => h.profesor).filter(p => p && p.trim() !== "");
+            const profs = [...new Set(rawProfs)].sort();
+            document.getElementById('admTeacher').innerHTML = '<option value="">Seleccione el profesor...</option>' + profs.map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+
+        function handleFileImport(e, mode) {
+            if(db.currentUser?.profile !== 'ADMIN') return;
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (mode === 'backup') {
+                        db = {...data, currentUser: db.currentUser};
+                        db.novedades = (db.novedades || []).map(n => ({...n, id: n.id || Date.now()}));
+                        saveStorage();
+                        refreshUI();
+                        populateAdminOptions();
+                        renderNoveltyLog();
+                        renderUserList();
+                        toast("SISTEMA RESTAURADO");
+                    } else {
+                        let imported = Array.isArray(data) ? data : (data.horarios || []);
+                        imported = imported.filter(h => {
+                            const val = (h.hora || h.horario || "").toLowerCase();
+                            return !val.includes("hora") && !val.includes("horario");
+                        });
+                        
+                        db.horarios = imported.map(h => ({...h, id: h.id || Math.random().toString(36).substr(2, 9)}));
+                        saveStorage();
+                        refreshUI();
+                        populateAdminOptions();
+                        toast("PLANILLA ACTUALIZADA");
+                    }
+                } catch(err) { toast("Error en formato JSON", "red"); }
             };
+            reader.readAsText(file);
+        }
+
+        function exportBackup() {
+            if(db.currentUser?.profile !== 'ADMIN') return;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `backup_mboehao_v10.json`);
+            dlAnchorElem.click();
+        }
+
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+
+        function toast(msg, color = "indigo") {
+            const t = document.createElement('div');
+            t.className = `fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl ${color === 'red' ? 'bg-red-600' : 'bg-slate-900'} text-white font-black text-[10px] uppercase z-[100] shadow-2xl transition-all duration-300 transform scale-110`;
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => {
+                t.style.opacity = '0';
+                setTimeout(() => t.remove(), 300);
+            }, 3000);
         }
     </script>
 </body>
